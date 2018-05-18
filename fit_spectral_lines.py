@@ -94,7 +94,9 @@ def continuum_normalization(ax, spectrum, absorption=True):
     plt.draw()
     return ax, x_cont, y_cont, flux_norm
     
-def fit_feature(spectrum, line_name, binsize, absorption=True, similar_widths=True, input_filename=None, input_append=None):
+def fit_feature(spectrum, line_name, binsize, absorption=True, 
+                similar_widths=True, fixed_offset = False, offsets=None,
+                input_filename=None, input_append=None):
     '''
     Fit single or multiple components to an emission or absorption feature
     Inputs:
@@ -151,16 +153,19 @@ def fit_feature(spectrum, line_name, binsize, absorption=True, similar_widths=Tr
         for x_center, y_center in center_list:
             lines.append(ax1.plot(x_center, y_center, 'r+'))
             if absorption is True:
-                model = model - profile(**{args['mean_arg']: x_center, args['size_arg']: 1.-y_center})
+                submodel = profile(**{args['mean_arg']: x_center, args['size_arg']: 1.-y_center})
+                submodel.amplitude.min = 0.0
+                model = model - submodel
             else:
-                model = model + profile(**{args['mean_arg']: x_center, args['size_arg']: 1.-y_center})
+                raise NotImplemented 
         if (len(center_list) > 1) and similar_widths is True:
             for i in np.arange(2, len(center_list)+1):  #For blended profiles, when similar widths is true, fix the widths to be the same for each profile
                 model.__getattribute__('{}_{}'.format(args['width_arg'], i)).tied = tie_widths(args['width_arg'])
-    
+        if (len(center_list) > 1) and fixed_offset is True:
+            for ioffset, i in zip(offsets, np.arange(2, len(center_list)+1)):
+                model.__getattribute__('{}_{}'.format(args['mean_arg'], i)).tied = tie_offset(ioffset, args['mean_arg'])
         fitter = fitting.LevMarLSQFitter()
         fit = fitter(model, line_wave, line_flux)
-        
         lines.append(ax1.plot(line_wave, line_flux))
         lines.append(ax1.plot(fit_wave, fit(fit_wave)))
         
@@ -252,6 +257,15 @@ def tie_widths(width_param):
     def inner(model):
         width = model.__getattribute__('{}_1'.format(width_param))
         return width
+    return inner
+    
+def tie_offset(offset, mean_param):
+    '''
+    for multiple lines of the same element, fix the offset between the lines
+    '''
+    def inner(model):
+        new_mean = model.__getattribute__('{}_1'.format(mean_param)).value+offset
+        return new_mean
     return inner
 
 def build_continuum_object(spectrum, x, y):
