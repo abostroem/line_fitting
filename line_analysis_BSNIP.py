@@ -176,6 +176,7 @@ def determine_error_binsize(wave, wave_bin=100):
         setting binsize=10, making wave_bin={}'.format(dispersion, wave_bin, 10*dispersion))
         binsize=10
     return binsize
+
 def define_continuum(wave, flux, edge_indx, binsize, err_binsize, absorption=True, visualize=False):
     '''
     Fit a quadratic and verify that it is the correct direction
@@ -220,6 +221,17 @@ def define_continuum(wave, flux, edge_indx, binsize, err_binsize, absorption=Tru
     return good_fit, endpt
     
 def calc_pseudo_ew(wave, flux, continuum_l, continuum_r, absorption=True, visualize=False):
+    '''
+    wave: array
+        array of wavelength (can be whole spectrum)
+    flux: array
+        array of fluxes (can be whole spectrum)
+    
+    * Create a fit to the continuum and define the continuum for each wavelength in wave
+    * Use continuum wavelengths to define index location of feature
+    * Calc pseudo equivalent width using flux, continuum, and delta wave as calculated from the
+    wave array
+    '''
     fitter = fitting.LinearLSQFitter()
     lin_mod = models.Linear1D()
     continuum_fit = fitter(lin_mod,[continuum_l.wave, continuum_r.wave], [continuum_l.flux, continuum_r.flux])
@@ -294,12 +306,18 @@ def calc_continuum_variance(wave, continuum_l, continuum_r):
 def calc_pew_variance(flux, continuum, delta_wave, flux_var, continuum_var, visualize=False, wave=None):
     '''
     Calculate the variance of the equivalent width
-    Inputs:
-        flux: flux values over which equivalent width is calculated
-        continuum: continuum values over which equivalent width is calculated
-        delta_wave: the wavelength bin size (in angstroms) used in the equivalent width calculation
-        flux_var: variance in the flux
-        continuum_var: variance in the continuum
+    Parameters:
+    -----------
+        flux: array
+            flux values over which equivalent width is calculated
+        continuum: array
+            continuum values over which equivalent width is calculated
+        delta_wave: int
+            the wavelength bin size (in angstroms) used in the equivalent width calculation
+        flux_var: array
+            variance in the flux
+        continuum_var: array
+            variance in the continuum
     Output:
         variance in the equivalent width
     '''
@@ -317,7 +335,7 @@ def calc_pew_variance(flux, continuum, delta_wave, flux_var, continuum_var, visu
             ax.errorbar(wave,(continuum-flux)/continuum, np.sqrt(pew_err))
     return pew_var
 
-def calc_velocity_error(wave, flux, continuum, vel_fit, visualize=False):
+def calc_velocity_error(wave, flux, vel_fit, continuum = None, visualize=False):
     '''
     Calculate 1-sigma errors
     '''
@@ -325,9 +343,13 @@ def calc_velocity_error(wave, flux, continuum, vel_fit, visualize=False):
     indx = np.argsort(wave - wave[min_indx])
     min_indx_indx = int(indx[indx==min_indx])
     cum_sum_right = 0
-    total = np.sum((flux-continuum))
+    if continuum is None:
+        flux_sub = flux
+    else:
+        flux_sub = flux - continuum
+    total = np.sum((flux_sub))
     for i in indx[min_indx_indx:]:
-        cum_sum_right += (flux-continuum)[i]
+        cum_sum_right += (flux_sub)[i]
         if cum_sum_right/total > .341:
             break
     right_err = wave[i]-wave[min_indx]
@@ -335,7 +357,7 @@ def calc_velocity_error(wave, flux, continuum, vel_fit, visualize=False):
     cum_sum_left = 0
     j=0
     for j in indx[:min_indx_indx][::-1]:
-        cum_sum_left += (flux-continuum)[j]
+        cum_sum_left += (flux_sub)[j]
         if cum_sum_left/total > .341:
             break
     left_err = wave[min_indx]-wave[j]
@@ -506,7 +528,7 @@ def characterize_line(feature_dict, filename, visualization_level=0):
         delta_wave = np.median(spectrum.wave[1:]-spectrum.wave[:-1])
         pew_var = calc_pew_variance(spectrum.flux[line_indx], continuum, delta_wave, flux_var, continuum_var, wave=spectrum.wave[line_indx])
         #Find the velocity error
-        vel_err = calc_velocity_error(spectrum.wave[line_indx], spectrum.flux[line_indx], continuum, vel_fit)
+        vel_err = calc_velocity_error(spectrum.wave[line_indx], spectrum.flux[line_indx], vel_fit, continuum=continuum)
         vel_min = spectrum.wave[line_indx][np.argmin(vel_fit(spectrum.wave[line_indx]))]
         if final_vis is True:
             fig = final_plot(spectrum.wave[min_indx:max_indx], spectrum.flux[min_indx:max_indx],spectrum.error[min_indx:max_indx], continuum_l, continuum_r, vel_fit, vel_min, vel_err, pew, pew_var)
