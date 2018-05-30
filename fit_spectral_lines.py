@@ -50,8 +50,59 @@ def calc_continuum(x_cont, y_cont, wave):
     continuum_fit = np.polyfit(x_cont, y_cont, 1)
     continuum_val = np.polyval(continuum_fit, wave)
     return continuum_val
+    
+def get_continuum_from_file(line_name, input_filename):
+    with open(input_filename, 'r') as ofile:
+        input_dict = yaml.load(ofile)
+    continuum_l = input_dict[line_name]['continuum']['left'] 
+    continuum_r = input_dict[line_name]['continuum']['right'] 
+    return continuum_l, continuum_r
+    
+def continuum_normalization_interactive():
+    #Select the edges of the feature and fit a line
+    input('Zoom in on line, press enter to continue')
+    print('Click on left and right continuum points')
+    (x1,y1), (x2,y2) = plt.ginput(2, timeout=0, show_clicks=True)
+    return (x1, y1), (x2, y2)
 
-def continuum_normalization(ax, spectrum, absorption=True):
+def id_fit_region_interactive():
+    #Select the region to fit   
+    input('Zoom in on line, press enter to continue') #Add in option to redefine continuum
+    print('select left and right edges of fit')
+    (x1,y1), (x2,y2) = plt.ginput(2, timeout=0, show_clicks=True)
+    return (x1, y1), (x2, y2)
+
+def get_id_fit_region_from_file(line_name, input_filename):
+    with open(input_filename, 'r') as ofile:
+        input_dict = yaml.load(ofile)
+    l_edge = input_dict[line_name]['feature']['l_edge']
+    r_edge = input_dict[line_name]['feature']['r_edge']
+    return l_edge, r_edge
+    
+def define_line_centers_interactive():
+        print('Select the center(s) of the line(s), press enter to continue')
+        center_list = plt.ginput(-1, timeout=0, show_clicks=True)
+        plt.draw()
+        return center_list
+
+def get_line_centers_from_file(line_name, input_filename):
+    with open(input_filename, 'r') as ofile:
+        input_dict = yaml.load(ofile)
+    center_list = input_dict[line_name]['feature']['center']
+    return center_list
+
+def get_fit_type_from_file(line_name, input_filename):
+    with open(input_filename, 'r') as ofile:
+        input_dict = yaml.load(ofile)
+    fit_type = input_dict[line_name]['fit']
+    if fit_type == 'Gausian1D':
+        return 'g'
+    elif fit_type == 'Lorentz1D':
+        return 'l'
+    elif fit_type == 'Moffat1D':
+        return 'm'
+
+def continuum_normalization(ax, spectrum, line_name, absorption=True, interactive=True, input_filename=None):
     '''
     Allow the user to select two points which will be fit with a straight line
     and used to normalize a feature
@@ -65,10 +116,10 @@ def continuum_normalization(ax, spectrum, absorption=True):
         x_cont: the x values of the two points selected by the user
         flux_norm: the flux normalized to the continuum
     '''
-    #Select the edges of the feature and fit a line
-    input('Zoom in on line, press enter to continue')
-    print('Click on left and right continuum points')
-    (x1,y1), (x2,y2) = plt.ginput(2, timeout=0, show_clicks=True)
+    if interactive is True:
+        (x1, y1), (x2, y2) = continuum_normalization_interactive()
+    else:
+        (x1, y1), (x2, y2) = get_continuum_from_file(line_name, input_filename)
     x_cont = np.array([x1, x2])
     y_cont = np.array([y1, y2])
     xlim = ax.get_xlim()
@@ -93,6 +144,7 @@ def continuum_normalization(ax, spectrum, absorption=True):
     ax.plot(x_cont, y_cont_norm, marker='o', ls='-')
     plt.draw()
     return ax, x_cont, y_cont, flux_norm
+    
 def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, 
                 offsets=None, fixed_offset=False, similar_widths=True, absorption=True):
         if fit_type in PROFILES:
@@ -136,7 +188,7 @@ def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2,
    
 def define_feature(spectrum, line_name, binsize, absorption=True, 
                 similar_widths=True, fixed_offset = False, offsets=None,
-                input_filename=None, input_append=False):
+                input_filename=None, input_append=False, interactive=True):
     '''
     Fit single or multiple components to an emission or absorption feature
     Inputs:
@@ -159,7 +211,7 @@ def define_feature(spectrum, line_name, binsize, absorption=True,
     * If similar widths is used then all features have exactly the same width
     '''
     interactive_fig, ax1, ax2 = plot_spectrum(spectrum)  
-    ax1, x_cont, y_cont, flux_norm = continuum_normalization(ax1, spectrum, absorption=absorption)
+    ax1, x_cont, y_cont, flux_norm = continuum_normalization(ax1, spectrum, line_name, input_filename=input_filename, interactive=interactive, absorption=absorption)
     continuum_l = build_continuum_object(spectrum, x_cont[0], y_cont[0])
     continuum_r = build_continuum_object(spectrum, x_cont[1], y_cont[1])
     #-----------------------
@@ -168,25 +220,33 @@ def define_feature(spectrum, line_name, binsize, absorption=True,
     while True:
         #Select the region to fit
         fit_wave = np.arange(x_cont.min(), x_cont.max()+1, 0.01)
-        input('Zoom in on line, press enter to continue') #Add in option to redefine continuum
-        print('select left and right edges of fit')
-        (x1,y1), (x2,y2) = plt.ginput(2, timeout=0, show_clicks=True)
+        if interactive is True:
+            (x1, y1), (x2, y2) = id_fit_region_interactive()
+        else:
+            get_id_fit_region_from_file(line_name, input_filename)
         #Select the normalized fit spectrum
         line_indx = (spectrum.wave<max(x1, x2)) & (spectrum.wave > min(x1, x2))
         line_wave = spectrum.wave[line_indx]
         line_flux = flux_norm[line_indx]
         #Select the line centers
-        print('Select the center(s) of the line(s), press enter to continue')
-        center_list = plt.ginput(-1, timeout=0, show_clicks=True)
-        plt.draw()
+        if interactive is True:
+            center_list = define_line_centers_interactive()
+        else:
+            center_list = get_line_centers_from_file(line_name, input_filename)
         #Select the fitting function
-        fit_type = input('What shape line would you like to fit? (g=gaussian (default), l=lorentz, m=moffat) ')
+        if interactive is True:
+            fit_type = input('What shape line would you like to fit? (g=gaussian (default), l=lorentz, m=moffat) ')
+        else:
+            fit_type = get_fit_type_from_file(linename, input_filename)
         fit, lines, args, ax1, ax2 = fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, offsets=offsets, fixed_offset=fixed_offset, similar_widths=similar_widths)
-        redo = input('Redo the fit? (y, n(default) ')
-        if redo.lower() == 'y': #Why doesn't this work?
-            for iline in lines:
-                iline[0].set_visible(False)
-            plt.draw()
+        if interactive is True:
+            redo = input('Redo the fit? (y, n(default) ')
+            if redo.lower() == 'y': 
+                for iline in lines:
+                    iline[0].set_visible(False)
+                plt.draw()
+            else:
+                break
         else:
             break
     fit_edge_l = build_continuum_object(spectrum, x1, y1)
