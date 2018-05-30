@@ -93,10 +93,50 @@ def continuum_normalization(ax, spectrum, absorption=True):
     ax.plot(x_cont, y_cont_norm, marker='o', ls='-')
     plt.draw()
     return ax, x_cont, y_cont, flux_norm
-    
-def fit_feature(spectrum, line_name, binsize, absorption=True, 
+def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, 
+                offsets=None, fixed_offset=False, similar_widths=True, absorption=True):
+        if fit_type in PROFILES:
+            profile, args = PROFILES[fit_type]
+        else:
+            profile, args = PROFILES['g']
+        model = models.Const1D(1.)
+        model.amplitude.fixed=True
+        lines = []
+
+        for x_center, y_center in center_list:
+            lines.append(ax1.plot(x_center, y_center, 'r+'))
+            if absorption is True:
+                submodel = profile(**{args['mean_arg']: x_center, args['size_arg']: 1.-y_center})
+                submodel.amplitude.min = 0.0
+                model = model - submodel
+            else:
+                raise NotImplemented 
+        if (len(center_list) > 1) and similar_widths is True:
+            for i in np.arange(2, len(center_list)+1):  #For blended profiles, when similar widths is true, fix the widths to be the same for each profile
+                model.__getattribute__('{}_{}'.format(args['width_arg'], i)).tied = tie_widths(args['width_arg'])
+        if (len(center_list) > 1) and fixed_offset is True:
+            for ioffset, i in zip(offsets, np.arange(2, len(center_list)+1)):
+                model.__getattribute__('{}_{}'.format(args['mean_arg'], i)).tied = tie_offset(ioffset, args['mean_arg'])
+        fitter = fitting.LevMarLSQFitter()
+        fit = fitter(model, line_wave, line_flux)
+        lines.append(ax1.plot(line_wave, line_flux))
+        lines.append(ax1.plot(fit_wave, fit(fit_wave)))
+        
+        if (len(center_list) > 1): #Check that more than 1 line was fit
+            for ifit in fit[1:]:
+                if absorption:
+                    lines.append(ax1.plot(fit_wave, fit[0](fit_wave) - ifit(fit_wave), ls=':'))
+                else:
+                    lines.append(ax1.plot(fit_wave, fit[0](fit_wave) + ifit(fit_wave), ls=':'))
+        #Plot the residuals
+        ax2.axhline(0, color = 'k')
+        lines.append(ax2.plot(line_wave, line_flux - fit(line_wave)))
+        plt.draw() 
+        return fit, lines, args, ax1, ax2
+   
+def define_feature(spectrum, line_name, binsize, absorption=True, 
                 similar_widths=True, fixed_offset = False, offsets=None,
-                input_filename=None, input_append=None):
+                input_filename=None, input_append=False):
     '''
     Fit single or multiple components to an emission or absorption feature
     Inputs:
@@ -141,45 +181,7 @@ def fit_feature(spectrum, line_name, binsize, absorption=True,
         plt.draw()
         #Select the fitting function
         fit_type = input('What shape line would you like to fit? (g=gaussian (default), l=lorentz, m=moffat) ')
-    
-        if fit_type in PROFILES:
-            profile, args = PROFILES[fit_type]
-        else:
-            profile, args = PROFILES['g']
-        model = models.Const1D(1.)
-        model.amplitude.fixed=True
-        lines = []
-
-        for x_center, y_center in center_list:
-            lines.append(ax1.plot(x_center, y_center, 'r+'))
-            if absorption is True:
-                submodel = profile(**{args['mean_arg']: x_center, args['size_arg']: 1.-y_center})
-                submodel.amplitude.min = 0.0
-                model = model - submodel
-            else:
-                raise NotImplemented 
-        if (len(center_list) > 1) and similar_widths is True:
-            for i in np.arange(2, len(center_list)+1):  #For blended profiles, when similar widths is true, fix the widths to be the same for each profile
-                model.__getattribute__('{}_{}'.format(args['width_arg'], i)).tied = tie_widths(args['width_arg'])
-        if (len(center_list) > 1) and fixed_offset is True:
-            for ioffset, i in zip(offsets, np.arange(2, len(center_list)+1)):
-                model.__getattribute__('{}_{}'.format(args['mean_arg'], i)).tied = tie_offset(ioffset, args['mean_arg'])
-        fitter = fitting.LevMarLSQFitter()
-        fit = fitter(model, line_wave, line_flux)
-        lines.append(ax1.plot(line_wave, line_flux))
-        lines.append(ax1.plot(fit_wave, fit(fit_wave)))
-        
-        if (len(center_list) > 1): #Check that more than 1 line was fit
-            for ifit in fit[1:]:
-                if absorption:
-                    lines.append(ax1.plot(fit_wave, fit[0](fit_wave) - ifit(fit_wave), ls=':'))
-                else:
-                    lines.append(ax1.plot(fit_wave, fit[0](fit_wave) + ifit(fit_wave), ls=':'))
-        #Plot the residuals
-        ax2.axhline(0, color = 'k')
-        lines.append(ax2.plot(line_wave, line_flux - fit(line_wave)))
-
-        plt.draw()
+        fit, lines, args, ax1, ax2 = fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, offsets=offsets, fixed_offset=fixed_offset, similar_widths=similar_widths)
         redo = input('Redo the fit? (y, n(default) ')
         if redo.lower() == 'y': #Why doesn't this work?
             for iline in lines:
