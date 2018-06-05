@@ -51,11 +51,11 @@ def calc_continuum(x_cont, y_cont, wave):
     continuum_val = np.polyval(continuum_fit, wave)
     return continuum_val
     
-def get_continuum_from_file(line_name, input_filename):
+def get_continuum_from_file(spec_filename, input_filename):
     with open(input_filename, 'r') as ofile:
         input_dict = yaml.load(ofile)
-    continuum_l = input_dict[line_name]['continuum']['left'] 
-    continuum_r = input_dict[line_name]['continuum']['right'] 
+    continuum_l = input_dict[spec_filename]['continuum']['left'] 
+    continuum_r = input_dict[spec_filename]['continuum']['right'] 
     return continuum_l, continuum_r
     
 def continuum_normalization_interactive():
@@ -72,11 +72,11 @@ def id_fit_region_interactive():
     (x1,y1), (x2,y2) = plt.ginput(2, timeout=0, show_clicks=True)
     return (x1, y1), (x2, y2)
 
-def get_id_fit_region_from_file(line_name, input_filename):
+def get_id_fit_region_from_file(spec_filename, input_filename):
     with open(input_filename, 'r') as ofile:
         input_dict = yaml.load(ofile)
-    l_edge = input_dict[line_name]['feature']['l_edge']
-    r_edge = input_dict[line_name]['feature']['r_edge']
+    l_edge = input_dict[spec_filename]['feature']['l_edge']
+    r_edge = input_dict[spec_filename]['feature']['r_edge']
     return l_edge, r_edge
     
 def define_line_centers_interactive():
@@ -85,16 +85,16 @@ def define_line_centers_interactive():
         plt.draw()
         return center_list
 
-def get_line_centers_from_file(line_name, input_filename):
+def get_line_centers_from_file(spec_filename, input_filename):
     with open(input_filename, 'r') as ofile:
         input_dict = yaml.load(ofile)
-    center_list = input_dict[line_name]['feature']['center']
+    center_list = input_dict[spec_filename]['feature']['center']
     return center_list
 
-def get_fit_type_from_file(line_name, input_filename):
+def get_fit_type_from_file(spec_filename, input_filename):
     with open(input_filename, 'r') as ofile:
         input_dict = yaml.load(ofile)
-    fit_type = input_dict[line_name]['fit']
+    fit_type = input_dict[spec_filename]['fit']
     if fit_type == 'Gausian1D':
         return 'g'
     elif fit_type == 'Lorentz1D':
@@ -102,7 +102,7 @@ def get_fit_type_from_file(line_name, input_filename):
     elif fit_type == 'Moffat1D':
         return 'm'
 
-def continuum_normalization(ax, spectrum, line_name, absorption=True, interactive=True, input_filename=None):
+def continuum_normalization(ax, spectrum, absorption=True, interactive=True, input_filename=None):
     '''
     Allow the user to select two points which will be fit with a straight line
     and used to normalize a feature
@@ -119,7 +119,7 @@ def continuum_normalization(ax, spectrum, line_name, absorption=True, interactiv
     if interactive is True:
         (x1, y1), (x2, y2) = continuum_normalization_interactive()
     else:
-        (x1, y1), (x2, y2) = get_continuum_from_file(line_name, input_filename)
+        (x1, y1), (x2, y2) = get_continuum_from_file(spectrum.filename, input_filename)
     x_cont = np.array([x1, x2])
     y_cont = np.array([y1, y2])
     xlim = ax.get_xlim()
@@ -211,7 +211,7 @@ def define_feature(spectrum, line_name, binsize, absorption=True,
     * If similar widths is used then all features have exactly the same width
     '''
     interactive_fig, ax1, ax2 = plot_spectrum(spectrum)  
-    ax1, x_cont, y_cont, flux_norm = continuum_normalization(ax1, spectrum, line_name, input_filename=input_filename, interactive=interactive, absorption=absorption)
+    ax1, x_cont, y_cont, flux_norm = continuum_normalization(ax1, spectrum, input_filename=input_filename, interactive=interactive, absorption=absorption)
     continuum_l = build_continuum_object(spectrum, x_cont[0], y_cont[0])
     continuum_r = build_continuum_object(spectrum, x_cont[1], y_cont[1])
     #-----------------------
@@ -223,7 +223,7 @@ def define_feature(spectrum, line_name, binsize, absorption=True,
         if interactive is True:
             (x1, y1), (x2, y2) = id_fit_region_interactive()
         else:
-            get_id_fit_region_from_file(line_name, input_filename)
+            (x1, y1), (x2, y2) = get_id_fit_region_from_file(spectrum.filename, input_filename)
         #Select the normalized fit spectrum
         line_indx = (spectrum.wave<max(x1, x2)) & (spectrum.wave > min(x1, x2))
         line_wave = spectrum.wave[line_indx]
@@ -232,12 +232,12 @@ def define_feature(spectrum, line_name, binsize, absorption=True,
         if interactive is True:
             center_list = define_line_centers_interactive()
         else:
-            center_list = get_line_centers_from_file(line_name, input_filename)
+            center_list = get_line_centers_from_file(spectrum.filename, input_filename)
         #Select the fitting function
         if interactive is True:
             fit_type = input('What shape line would you like to fit? (g=gaussian (default), l=lorentz, m=moffat) ')
         else:
-            fit_type = get_fit_type_from_file(linename, input_filename)
+            fit_type = get_fit_type_from_file(spectrum.filename, input_filename)
         fit, lines, args, ax1, ax2 = fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, offsets=offsets, fixed_offset=fixed_offset, similar_widths=similar_widths)
         if interactive is True:
             redo = input('Redo the fit? (y, n(default) ')
@@ -251,8 +251,8 @@ def define_feature(spectrum, line_name, binsize, absorption=True,
             break
     fit_edge_l = build_continuum_object(spectrum, x1, y1)
     fit_edge_r = build_continuum_object(spectrum, x2, y2)
-    if input_filename is not None:
-        write_input(input_filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=input_append)
+    if (input_filename is not None) and (interactive is True):
+        write_input(spectrum.filename, input_filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=input_append)
     min_list, pew_list = calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, binsize, args)
     fig = final_plot(line_wave, line_flux, spectrum.error[line_indx], 
                 continuum_l, continuum_r, 
@@ -379,9 +379,12 @@ def calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, binsiz
     pew_list = calc_pew(spectrum, fit, continuum_l, continuum_r, binsize)
     return min_list, pew_list
 
+class NoAliasDumper(yaml.Dumper):
+    def ignore_aliases(self, data):
+        return True
 
-def write_input(filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=True):
-    input_dict = {line_name: 
+def write_input(spec_filename, filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=True):
+    input_dict = {spec_filename: 
                     {'continuum': 
                         {'left':(continuum_l.wave, continuum_l.flux), 
                          'right':(continuum_r.wave, continuum_r.flux)},
@@ -395,7 +398,7 @@ def write_input(filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_e
     else:
         ofile = open(filename, 'w')
 
-    ofile.write(yaml.dump(input_dict))
+    ofile.write(yaml.dump(input_dict, Dumper=NoAliasDumper))
     ofile.close()  
 
 def print_output(fit):
