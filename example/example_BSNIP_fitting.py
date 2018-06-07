@@ -16,8 +16,6 @@ import line_analysis_BSNIP
 
 FIG_DIR = '../figures'
 OUTPUT_DIR = '../data/line_info'
-input_file = '../data/line_vel_analysis_input.yml'
-#plt.ioff()
 append = False
 
 
