@@ -357,7 +357,6 @@ def calc_min_wavelength(fit_wave, fit, args):
     return min_list
     
 def calc_pew(spectrum, fit, continuum_l, continuum_r):
-    import pdb; pdb.set_trace()
     line_indx = (spectrum.wave<=continuum_r.wave) & (spectrum.wave>=continuum_l.wave)
     pew_list = []
     continuum = calc_continuum([continuum_l.wave, continuum_r.wave], [continuum_l.flux, continuum_r.flux], spectrum.wave[line_indx])
