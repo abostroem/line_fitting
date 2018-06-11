@@ -186,7 +186,7 @@ def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2,
         plt.draw() 
         return fit, lines, args, ax1, ax2
    
-def define_feature(spectrum, line_name, binsize, absorption=True, 
+def define_feature(spectrum, line_name, absorption=True, 
                 similar_widths=True, fixed_offset = False, offsets=None,
                 input_filename=None, input_append=False, interactive=True):
     '''
@@ -253,7 +253,7 @@ def define_feature(spectrum, line_name, binsize, absorption=True,
     fit_edge_r = build_continuum_object(spectrum, x2, y2)
     if (input_filename is not None) and (interactive is True):
         write_input(spectrum.filename, input_filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=input_append)
-    min_list, pew_list = calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, binsize, args)
+    min_list, pew_list = calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, args)
     fig = final_plot(line_wave, line_flux, spectrum.error[line_indx], 
                 continuum_l, continuum_r, 
                 fit_edge_l, fit_edge_r, 
@@ -356,27 +356,29 @@ def calc_min_wavelength(fit_wave, fit, args):
         min_list.append((min_wave, min_wave_stddev_l, min_wave_stddev_r))
     return min_list
     
-def calc_pew(spectrum, fit, continuum_l, continuum_r, binsize):
+def calc_pew(spectrum, fit, continuum_l, continuum_r):
+    import pdb; pdb.set_trace()
     line_indx = (spectrum.wave<=continuum_r.wave) & (spectrum.wave>=continuum_l.wave)
     pew_list = []
     continuum = calc_continuum([continuum_l.wave, continuum_r.wave], [continuum_l.flux, continuum_r.flux], spectrum.wave[line_indx])
+    continuum_all = calc_continuum([continuum_l.wave, continuum_r.wave], [continuum_l.flux, continuum_r.flux], spectrum.wave)
     continuum_var = line_analysis_BSNIP.calc_continuum_variance(spectrum.wave[line_indx], continuum_l, continuum_r)
     delta_wave = np.median(spectrum.wave[1:]-spectrum.wave[:-1])
     pew_var = line_analysis_BSNIP.calc_pew_variance(spectrum.flux[line_indx], continuum, delta_wave, (spectrum.error**2)[line_indx], continuum_var)
     if fit.n_submodels() > 2:
         for model in fit[1:]:
-            fit_flux = model(spectrum.wave)
+            fit_flux = (fit[0](spectrum.wave) - model(spectrum.wave))*continuum_all
             pew = line_analysis_BSNIP.calc_pseudo_ew(spectrum.wave, fit_flux, continuum_l, continuum_r)
             pew_list.append((pew, pew_var))
     else:
-        fit_flux = fit[1](spectrum.wave)
+        fit_flux = (fit[0](spectrum.wave) - fit[1](spectrum.wave))*continuum_all
         pew = line_analysis_BSNIP.calc_pseudo_ew(spectrum.wave, fit_flux, continuum_l, continuum_r)
         pew_list.append((pew, pew_var))    
     return pew_list
 
-def calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, binsize, args):
+def calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, args):
     min_list = calc_min_wavelength(fit_wave, fit, args)
-    pew_list = calc_pew(spectrum, fit, continuum_l, continuum_r, binsize)
+    pew_list = calc_pew(spectrum, fit, continuum_l, continuum_r)
     return min_list, pew_list
 
 class NoAliasDumper(yaml.Dumper):
