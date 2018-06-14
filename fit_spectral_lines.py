@@ -387,12 +387,12 @@ class NoAliasDumper(yaml.Dumper):
 def write_input(spec_filename, filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=True):
     input_dict = {spec_filename: 
                     {'continuum': 
-                        {'left':(continuum_l.wave, continuum_l.flux), 
-                         'right':(continuum_r.wave, continuum_r.flux)},
+                        {'left':[float(continuum_l.wave), float(continuum_l.flux)], 
+                         'right':[float(continuum_r.wave), float(continuum_r.flux)]},
                      'feature':
-                        {'l_edge':(fit_edge_l.wave, fit_edge_l.flux),
-                         'r_edge': (fit_edge_r.wave, fit_edge_r.flux),
-                         'center':center_list},
+                        {'l_edge':[float(fit_edge_l.wave), float(fit_edge_l.flux)],
+                         'r_edge': [float(fit_edge_r.wave), float(fit_edge_r.flux)],
+                         'center':[[float(tup[0]), float(tup[1])] for tup in center_list]},
                     'fit': type(fit[1]).name}}
     if append is True:
             ofile = open(filename, 'a')
