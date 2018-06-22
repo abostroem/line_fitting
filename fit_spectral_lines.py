@@ -146,7 +146,9 @@ def continuum_normalization(ax, spectrum, absorption=True, interactive=True, inp
     return ax, x_cont, y_cont, flux_norm
     
 def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, 
-                offsets=None, fixed_offset=False, similar_widths=True, absorption=True):
+                continuum_l, continuum_r,
+                offsets=None, fixed_offset=False, similar_widths=True, absorption=True,
+                search_range=None):
         if fit_type in PROFILES:
             profile, args = PROFILES[fit_type]
         else:
@@ -154,12 +156,15 @@ def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2,
         model = models.Const1D(1.)
         model.amplitude.fixed=True
         lines = []
-
+        initial_width = np.abs(continuum_l.wave - continuum_r.wave)/len(center_list)/10. #Following IRAF splot definition
         for x_center, y_center in center_list:
             lines.append(ax1.plot(x_center, y_center, 'r+'))
             if absorption is True:
-                submodel = profile(**{args['mean_arg']: x_center, args['size_arg']: 1.-y_center})
+                submodel = profile(**{args['mean_arg']: x_center, args['size_arg']: 1.-y_center, args['width_arg']:initial_width})
                 submodel.amplitude.min = 0.0
+                if search_range is not None:
+                    mean = submodel.__getattribute__(args['mean_arg']).value
+                    submodel.bounds[args['mean_arg']]= (mean-search_range, mean+search_range)
                 model = model - submodel
             else:
                 raise NotImplemented 
@@ -170,7 +175,9 @@ def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2,
             for ioffset, i in zip(offsets, np.arange(2, len(center_list)+1)):
                 model.__getattribute__('{}_{}'.format(args['mean_arg'], i)).tied = tie_offset(ioffset, args['mean_arg'])
         fitter = fitting.LevMarLSQFitter()
-        fit = fitter(model, line_wave, line_flux)
+        fit = fitter(model, line_wave, line_flux, maxiter=1000)
+        if fitter.fit_info:
+            print('fit message',fitter.fit_info['message'])
         lines.append(ax1.plot(line_wave, line_flux))
         lines.append(ax1.plot(fit_wave, fit(fit_wave)))
         
@@ -188,7 +195,8 @@ def fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2,
    
 def define_feature(spectrum, line_name, absorption=True, 
                 similar_widths=True, fixed_offset = False, offsets=None,
-                input_filename=None, input_append=False, interactive=True):
+                input_filename=None, input_append=False, interactive=True,
+                return_fit=False, search_range=None):
     '''
     Fit single or multiple components to an emission or absorption feature
     Inputs:
@@ -238,7 +246,10 @@ def define_feature(spectrum, line_name, absorption=True,
             fit_type = input('What shape line would you like to fit? (g=gaussian (default), l=lorentz, m=moffat) ')
         else:
             fit_type = get_fit_type_from_file(spectrum.filename, input_filename)
-        fit, lines, args, ax1, ax2 = fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, offsets=offsets, fixed_offset=fixed_offset, similar_widths=similar_widths)
+        fit, lines, args, ax1, ax2 = fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2, 
+                                                 continuum_l, continuum_r,
+                                                 offsets=offsets, fixed_offset=fixed_offset, similar_widths=similar_widths,
+                                                 search_range=search_range)
         if interactive is True:
             redo = input('Redo the fit? (y, n(default) ')
             if redo.lower() == 'y': 
@@ -259,8 +270,11 @@ def define_feature(spectrum, line_name, absorption=True,
                 fit_edge_l, fit_edge_r, 
                 fit, min_list,
                 pew_list)
-    plt.close(interactive_fig)
-    return min_list, pew_list, fig
+    if return_fit is True:
+        return min_list, pew_list, fig, fit, interactive_fig
+    else:
+        plt.close(interactive_fig)
+        return min_list, pew_list, fig
 
 def plot_model(ax, wave, continuum_l, continuum_r, vel_min, vel_err, pew, pew_err, fit):
     x_cont = np.array([continuum_l.wave, continuum_r.wave])
