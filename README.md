@@ -78,6 +78,7 @@ Documentation for most commonly used functions in fit\_spectral\_lines.py
     * Fit to emission is not yet implemented  
     * If similar widths is used then all features have exactly the same width  
 |  
+
     fit_feature(line_wave, line_flux, fit_wave, fit_type, center_list, ax1, ax2,   
                 continuum_l, continuum_r,  
                 offsets=None, fixed_offset=False, similar_widths=True, absorption=True,  
