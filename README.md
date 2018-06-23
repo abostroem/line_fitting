@@ -20,7 +20,7 @@ and call the interactive line fitting in line 13.
 
 Documentation for most commonly used functions in fit\_spectral\_lines.py
 
-define\_feature(spectrum, line\_name, absorption=True, 
+    define\_feature(spectrum, line\_name, absorption=True, 
                 similar\_widths=True, fixed\_offset = False, offsets=None,
                 input\_filename=None, input\_append=False, interactive=True,
                 return\_fit=False, search\_range=None, define\_fit\_range=True):
@@ -78,7 +78,7 @@ define\_feature(spectrum, line\_name, absorption=True,
     * Fit to emission is not yet implemented  
     * If similar widths is used then all features have exactly the same width  
 
-fit\_feature(line\_wave, line\_flux, fit\_wave, fit\_type, center\_list, ax1, ax2,   
+    fit\_feature(line\_wave, line\_flux, fit\_wave, fit\_type, center\_list, ax1, ax2,   
                 continuum\_l, continuum\_r,  
                 offsets=None, fixed\_offset=False, similar\_widths=True, absorption=True,  
                 search\_range=None):
