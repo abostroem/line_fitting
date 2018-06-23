@@ -24,12 +24,12 @@ endpoint = namedtuple('endpoint', ['wave', 'flux', 'error'])
 
 FIG_DIR = '../figures'
 
-def read_iraf_spectrum(filename):
+def read_iraf_spectrum(filename, redshift=0.0069):
     ofile = fits.open(filename)
     flux = ofile[0].data[0,0,:]
     err = ofile[0].data[3,0,:]
     wave = spec.calc_wavelength(ofile[0].header, np.arange(len(flux))+1)
-    rest_wave = spec.apply_redshift(wave, 0.0069)
+    rest_wave = spec.apply_redshift(wave, redshift)
     return(spec.spectrum1d(rest_wave, flux, error=err))
     
 def smooth_signal(flux, width, poly_deg):
