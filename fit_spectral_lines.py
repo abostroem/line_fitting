@@ -249,7 +249,8 @@ def define_feature(spectrum, line_name, absorption=True,
     Fit single or multiple components to an emission or absorption feature
     Inputs:
         spectrum: spectrum1d object
-            spectrum1d class object with wave and flux attributes
+            spectrum1d class object with wave, flux, err, and filename attributes.
+            filename will be used as a unique key when the input values are recorded
         line_name: str
             name of the line you are going to fit
         absorption (optional ): bool
@@ -350,7 +351,7 @@ def define_feature(spectrum, line_name, absorption=True,
     if (input_filename is not None) and (interactive is True):
         write_input(spectrum.filename, input_filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=input_append)
     min_list, pew_list = calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, args)
-    fig = final_plot(line_wave, line_flux, spectrum.error[line_indx], 
+    fig = final_plot(spectrum, line_wave, line_flux, spectrum.error[line_indx], 
                 continuum_l, continuum_r, 
                 fit_edge_l, fit_edge_r, 
                 fit, min_list,
@@ -374,7 +375,7 @@ def plot_model(ax, wave, continuum_l, continuum_r, vel_min, vel_err, pew, pew_er
     ax.add_collection(pew_collection_err)
     ax.add_collection(pew_collection)
     
-def final_plot(wave, flux, flux_err, continuum_l, continuum_r, fit_edge_l, fit_edge_r, fit, min_list, pew_list):
+def final_plot(spectrum, wave, flux, flux_err, continuum_l, continuum_r, fit_edge_l, fit_edge_r, fit, min_list, pew_list):
     #plt.ioff()
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -383,6 +384,9 @@ def final_plot(wave, flux, flux_err, continuum_l, continuum_r, fit_edge_l, fit_e
     x_fit_edge = np.array([fit_edge_l.wave, fit_edge_r.wave])
     y_fit_edge = np.array([fit_edge_l.flux, fit_edge_r.flux])
     continuum = calc_continuum(x_cont, y_cont, wave)
+    continuum_all = calc_continuum(x_cont, y_cont, spectrum.wave)
+    full_profile_indx = (spectrum.wave>x_cont[0]) & (spectrum.wave<x_cont[1])
+    full_profile_wave = spectrum.wave[full_profile_indx]
     ax.errorbar(wave, flux, flux_err/continuum, fmt='.', label='Spectrum', linestyle='-')
     ax.errorbar(x_cont,
                 y_cont/y_cont,
@@ -392,17 +396,21 @@ def final_plot(wave, flux, flux_err, continuum_l, continuum_r, fit_edge_l, fit_e
             y_fit_edge,
             np.array([fit_edge_l.error, fit_edge_r.error]),
             fmt='o', label='Fit Edges')
-    ax.plot(wave, fit(wave), label='Velocity fit')
+    ax.plot(full_profile_wave, fit(full_profile_wave), label='Velocity fit')
     if fit.n_submodels() > 2:
         for v, p, model in zip(min_list, pew_list, fit[1:]):
             vel, vel_err_l, vel_err_r = v
             pew, pew_err = p
-            plot_model(ax, wave, continuum_l, continuum_r, vel, (vel_err_l, vel_err_r), pew, pew_err, model)
+            plot_model(ax, full_profile_wave, continuum_l, continuum_r, vel, (vel_err_l, vel_err_r), pew, pew_err, model)
     else:
         vel, vel_err_l, vel_err_r = min_list[0]
         pew, pew_err = pew_list[0]
         plot_model(ax, wave, continuum_l, continuum_r, vel, (vel_err_l, vel_err_r), pew, pew_err, fit[1])
-        
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    ax.plot(spectrum.wave, spectrum.flux/continuum_all, color='k', alpha=0.25, zorder=0)  
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)      
     ax.legend(loc='best')
     ax.set_xlabel('Wavelength')
     ax.set_ylabel('Continuum Divided flux')
