@@ -18,7 +18,7 @@ from matplotlib import pyplot as plt
 import matplotlib.collections as collections
 from matplotlib.backends.backend_pdf import PdfPages
 
-import spectroscopy as spec
+from utilities_az import spectroscopy as spec
 
 endpoint = namedtuple('endpoint', ['wave', 'flux', 'error'])
 
