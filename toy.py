@@ -1,4 +1,5 @@
 import os
+import sys
 
 from matplotlib import pyplot as plt
 
@@ -6,7 +7,11 @@ from astropy.io import fits, ascii as asc
 from astropy.table import Table, Column
 
 from utilities_az import spectroscopy as spec
+
+sys.path.append(<path to line_fitting>)
 from fit_spectral_lines import define_feature
+
+
 
 filename = '../data/2014G/2014G_2014-03-17_19-09-29_Galileo_BC-Asi_None.dat'
 
