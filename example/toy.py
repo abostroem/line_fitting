@@ -8,23 +8,27 @@ from astropy.table import Table, Column
 
 from utilities_az import spectroscopy as spec
 
-sys.path.append(<path to line_fitting>)
+#sys.path.append(<path to line_fitting>)
 from fit_spectral_lines import define_feature
 
 
 
-filename = '../data/2014G/2014G_2014-03-17_19-09-29_Galileo_BC-Asi_None.dat'
+filename = '../../data/2014G/2014G_2014-03-17_19-09-29_Galileo_BC-Asi_None.dat'
 
 tbdata = asc.read(filename, names=['wave', 'flux'])
 error = tbdata['flux']*0.05
+#error = None
 spectrum = spec.spectrum1d(tbdata['wave'], tbdata['flux'], error)
+spectrum.filename = filename
 line_name = 'A'
 
 min_list, pew_list, fig = define_feature(spectrum, line_name,
                                          absorption=True, 
                                          similar_widths=True, 
                                          interactive = True,
-                                         define_fit_range=True)
+                                         define_fit_range=True,
+                                         input_append=True,
+                                         input_filename = 'test.yml')
                                          
 min_wave = [i[0] for i in min_list]
 min_wave_std = [j[1].value for j in min_list]
