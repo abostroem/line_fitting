@@ -266,7 +266,7 @@ def define_feature(spectrum, line_name, absorption=True,
         input_filename: str
             name of file that input fit parameters will be read from when interactive=False
         input_append: bool
-            if True, input parameters will be appended to current informatio in input_filename, 
+            if True, input parameters will be appended to current information in input_filename, 
             if False, the file will be over written
         interactive: bool
             If True, user is asked to define fitting parameters
@@ -300,6 +300,8 @@ def define_feature(spectrum, line_name, absorption=True,
     * Fit to emission is not yet implemented
     * If similar widths is used then all features have exactly the same width
     '''
+    if isinstance(spectrum.error, np.float64):
+        spectrum.error = None
     interactive_fig, ax1, ax2 = plot_spectrum(spectrum)  
     ax1, x_cont, y_cont, flux_norm = continuum_normalization(ax1, spectrum, input_filename=input_filename, interactive=interactive, absorption=absorption)
     continuum_l = build_continuum_object(spectrum, x_cont[0], y_cont[0])
@@ -351,7 +353,7 @@ def define_feature(spectrum, line_name, absorption=True,
     if (input_filename is not None) and (interactive is True):
         write_input(spectrum.filename, input_filename, line_name, continuum_l, continuum_r, fit_edge_l, fit_edge_r, center_list, fit, append=input_append)
     min_list, pew_list = calc_output_values(spectrum, fit, fit_wave, continuum_l, continuum_r, args)
-    fig = final_plot(spectrum, line_wave, line_flux, spectrum.error[line_indx], 
+    fig = final_plot(spectrum, line_wave, line_flux, spectrum.error, line_indx, 
                 continuum_l, continuum_r, 
                 fit_edge_l, fit_edge_r, 
                 fit, min_list,
@@ -366,16 +368,19 @@ def plot_model(ax, wave, continuum_l, continuum_r, vel_min, vel_err, pew, pew_er
     x_cont = np.array([continuum_l.wave, continuum_r.wave])
     y_cont = np.array([continuum_l.flux, continuum_r.flux])
     ax.errorbar(vel_min, np.min(1.0-fit(vel_min)), xerr=(vel_err,), fmt='s', label='Velocity')
-    pew_collection_err = collections.BrokenBarHCollection.span_where(wave, ymin=0, ymax=1, 
+    if pew_err is not None:
+        pew_collection_err = collections.BrokenBarHCollection.span_where(wave, ymin=0, ymax=1, 
                                                         where= (wave>=vel_min-pew/2-np.sqrt(pew_err))&(wave<=vel_min+pew/2+np.sqrt(pew_err)),
                                                         color='k', alpha=0.1)
+        ax.add_collection(pew_collection_err)
+    
     pew_collection = collections.BrokenBarHCollection.span_where(wave, ymin=0, ymax=1, 
                                                         where= (wave>=vel_min-pew/2)&(wave<=vel_min+pew/2),
                                                         color='k', alpha=0.1, label = 'pEW')
-    ax.add_collection(pew_collection_err)
+    
     ax.add_collection(pew_collection)
     
-def final_plot(spectrum, wave, flux, flux_err, continuum_l, continuum_r, fit_edge_l, fit_edge_r, fit, min_list, pew_list):
+def final_plot(spectrum, wave, flux, flux_err, line_indx, continuum_l, continuum_r, fit_edge_l, fit_edge_r, fit, min_list, pew_list):
     #plt.ioff()
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -387,15 +392,24 @@ def final_plot(spectrum, wave, flux, flux_err, continuum_l, continuum_r, fit_edg
     continuum_all = calc_continuum(x_cont, y_cont, spectrum.wave)
     full_profile_indx = (spectrum.wave>x_cont[0]) & (spectrum.wave<x_cont[1])
     full_profile_wave = spectrum.wave[full_profile_indx]
-    ax.errorbar(wave, flux, flux_err/continuum, fmt='.', label='Spectrum', linestyle='-')
-    ax.errorbar(x_cont,
-                y_cont/y_cont,
-                np.array([continuum_l.error, continuum_r.error])/y_cont,
-                fmt='o', label='Continuum Edges')
-    ax.errorbar(x_fit_edge,
-            y_fit_edge,
-            np.array([fit_edge_l.error, fit_edge_r.error]),
-            fmt='o', label='Fit Edges')
+    if spectrum.error is None:
+        ax.plot(wave, flux, '.', label='Spectrum', linestyle='-')
+        ax.plot(x_cont,
+                    y_cont/y_cont,
+                    'o', label='Continuum Edges')
+        ax.plot(x_fit_edge,
+                y_fit_edge,
+                'o', label='Fit Edges')
+    else:
+        ax.errorbar(wave, flux, flux_err[line_indx]/continuum, fmt='.', label='Spectrum', linestyle='-')
+        ax.errorbar(x_cont,
+                    y_cont/y_cont,
+                    np.array([continuum_l.error, continuum_r.error])/y_cont,
+                    fmt='o', label='Continuum Edges')
+        ax.errorbar(x_fit_edge,
+                y_fit_edge,
+                np.array([fit_edge_l.error, fit_edge_r.error]),
+                fmt='o', label='Fit Edges')
     ax.plot(full_profile_wave, fit(full_profile_wave), label='Velocity fit')
     if fit.n_submodels() > 2:
         for v, p, model in zip(min_list, pew_list, fit[1:]):
@@ -440,7 +454,10 @@ def tie_offset(offset, mean_param):
 def build_continuum_object(spectrum, x, y):
     err_binsize = line_analysis_BSNIP.determine_error_binsize(spectrum.wave, wave_bin=100)
     edge_indx = np.argmin(np.abs(spectrum.wave - x))
-    edge_err = np.median(spectrum.error[edge_indx-int(err_binsize//2):edge_indx+int(err_binsize//2)])
+    if spectrum.error is not None:
+        edge_err = np.median(spectrum.error[edge_indx-int(err_binsize//2):edge_indx+int(err_binsize//2)])
+    else:
+        edge_err = None
     continuum = line_analysis_BSNIP.endpoint(x, y, edge_err)
     return continuum
 
@@ -468,9 +485,15 @@ def calc_pew(spectrum, fit, continuum_l, continuum_r):
     pew_list = []
     continuum = calc_continuum([continuum_l.wave, continuum_r.wave], [continuum_l.flux, continuum_r.flux], spectrum.wave[line_indx])
     continuum_all = calc_continuum([continuum_l.wave, continuum_r.wave], [continuum_l.flux, continuum_r.flux], spectrum.wave)
-    continuum_var = line_analysis_BSNIP.calc_continuum_variance(spectrum.wave[line_indx], continuum_l, continuum_r)
+    if spectrum.error is None:
+        continuum_var = None
+    else:
+        continuum_var = line_analysis_BSNIP.calc_continuum_variance(spectrum.wave[line_indx], continuum_l, continuum_r)
     delta_wave = np.median(spectrum.wave[1:]-spectrum.wave[:-1])
-    pew_var = line_analysis_BSNIP.calc_pew_variance(spectrum.flux[line_indx], continuum, delta_wave, (spectrum.error**2)[line_indx], continuum_var)
+    if spectrum.error is None:
+        pew_var = None
+    else:
+        pew_var = line_analysis_BSNIP.calc_pew_variance(spectrum.flux[line_indx], continuum, delta_wave, (spectrum.error**2)[line_indx], continuum_var)
     if fit.n_submodels() > 2:
         for model in fit[1:]:
             fit_flux = (fit[0](spectrum.wave) - model(spectrum.wave))*continuum_all
