@@ -574,7 +574,10 @@ class spectral_feature(object):
         plt.ion()
     
     def plot_model(self, vel_min, vel_err, pew, pew_err, ifit):
-        self.final_ax.errorbar(vel_min, np.min(1.0-ifit(vel_min)), xerr=(vel_err,), fmt='s', label='Velocity')
+        xerr = (vel_err,)
+        if np.shape(xerr)[0] != 2:
+            xerr = np.array(xerr).T
+        self.final_ax.errorbar(vel_min, np.min(1.0-ifit(vel_min)), xerr=xerr, fmt='s', label='Velocity')
         if pew_err is not None:
             pew_collection_err = collections.BrokenBarHCollection.span_where(self.spectrum.wave[self.fit_indx], ymin=0, ymax=1, 
                                                             where= (self.spectrum.wave[self.fit_indx]>=vel_min-pew/2-np.sqrt(pew_err))&(self.spectrum.wave[self.fit_indx]<=vel_min+pew/2+np.sqrt(pew_err)),
@@ -586,8 +589,6 @@ class spectral_feature(object):
                                                             color='k', alpha=0.1, label = 'pEW')
     
         self.final_ax.add_collection(pew_collection)
-
-
 
 def print_output(fit):
     '''
@@ -603,10 +604,7 @@ def print_output(fit):
             print('\tFWHM: {}'.format(ifit.fwhm.value))
         print('\tAmplitude: {}/1.'.format(ifit.amplitude.value))
         
-
-
-
-        
+       
 if __name__ == "__main__":
     spectrum_filename = 'ASASSN15oz_VLT_20150921sca.asci'
     tbdata = Table.read(spectrum_filename, format='ascii', names=['wave', 'flux'])
