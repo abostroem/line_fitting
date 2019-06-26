@@ -8,7 +8,7 @@ at supernova spectra.
 Quickstart:
 -----------
 ```  
-$ python fit\_lines.py input_filename
+$ python fit_lines.py input_filename
 ```
 input filename must be in one of the following formats:
 * an ascii file with the first column wavelength and the second column flux
