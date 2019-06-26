@@ -1,3 +1,5 @@
+#!/usr/bin/env python 
+
 import argparse
 import os
 
@@ -24,7 +26,7 @@ def get_spectrum(filename, ext=None):
         data = ofile[ext].data    
         #Table data
         if isinstance(data, (fits.BinTableHDU, fits.fitsrec.FITS_rec)):
-            colnames = data.colnames
+            colnames = data.names
             for icol in colnames:
                 if 'wave' in icol.lower():
                     wave = data[icol]
@@ -67,6 +69,8 @@ def get_spectrum(filename, ext=None):
     
     if (len(wave)==0) or (len(flux)==0):
         sys.exit('Unable to read fits file format')
+    elif len(wave)==1:
+        spectrum = spec.spectrum1d(wave[0], flux[0])
     else:
         spectrum = spec.spectrum1d(wave, flux)
     return spectrum
@@ -103,7 +107,6 @@ parser.add_argument('--def_fit_range', action='store_true',
                     help='flag to define separately the continuum edges and the fit range')
                     
 args = parser.parse_args()
-
 #Read file
 spectrum = get_spectrum(args.filename, args.ext)
 spectrum.wave = spec.apply_redshift(spectrum.wave, args.redshift)
@@ -144,7 +147,7 @@ else:
                              'f8', 'f8', 'f8', 
                              'f8', 'f8', 'S50', 'f8'))
 #Add a column for rest wavelength if provided
-if args.rest_wave is not None:
+if (args.rest_wave is not None) and ('rest_wave' not in tbdata.colnames):
     tbdata.add_column(Column(name='rest_wave', dtype='f8'))
     
 #define line name
