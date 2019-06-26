@@ -5,9 +5,11 @@ at supernova spectra.
 * line\_analysis\_BSNIP.py follows the Silverman et al (2012) method. 
 * fit\_spectral\_lines.py fits multiple gaussian profiles simultaneously
 
-Quickstart:  
-$ python fit\_line.py input_filename
-
+Quickstart:
+-----------
+```  
+$ python fit\_lines.py input_filename
+```
 input filename must be in one of the following formats:
 * an ascii file with the first column wavelength and the second column flux
 * an ascii file with a column with 'wave' in the name and a column with 'flux' in a format that astropy.io.ascii.read can recognize the column names
@@ -15,6 +17,12 @@ input filename must be in one of the following formats:
 * a fits file with a 4x1xn array where the first (of four) columns represents the flux and the wavelength solution in the header
 * a fits binary table or fits rec array with a column name with 'wave' in it and a column name with 'flux' in it
 
+There are a variety of command line options that can be accessed with python fit\_line.py --help
+
+Advanced example of fitting Ha emission on a fits binary table with the spectrum in the 1st extension
+```
+$ python fit_lines.py 1999em_19991208_2451520.5_1.fits --ext 1 -p e --output 1999em_fit.csv --rest_wave 6563 -n Ha --def_fit_range
+```
 
 Example wrappers of these scripts are in the examples directory. 
 
