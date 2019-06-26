@@ -24,6 +24,9 @@ Advanced example of fitting Ha emission on a fits binary table with the spectrum
 $ python fit_lines.py 1999em_19991208_2451520.5_1.fits --ext 1 -p e --output 1999em_fit.csv --rest_wave 6563 -n Ha --def_fit_range
 ```
 
+To script the input and output:
+-------------------------------
+
 Example wrappers of these scripts are in the examples directory. 
 
 * example/example\_BSNIP\_fitting.py demonstrates how to setup the line\_analysis\_BSNIP.py. 
